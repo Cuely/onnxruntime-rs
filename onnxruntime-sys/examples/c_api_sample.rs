@@ -20,7 +20,7 @@ fn main() {
     let env_name = std::ffi::CString::new("test").unwrap();
     let status = unsafe {
         g_ort.as_ref().unwrap().CreateEnv.unwrap()(
-            OrtLoggingLevel::ORT_LOGGING_LEVEL_VERBOSE,
+            OrtLoggingLevel_ORT_LOGGING_LEVEL_VERBOSE,
             env_name.as_ptr(),
             &mut env_ptr,
         )
@@ -42,10 +42,7 @@ fn main() {
             .as_ref()
             .unwrap()
             .SetSessionGraphOptimizationLevel
-            .unwrap()(
-            session_options_ptr,
-            GraphOptimizationLevel::ORT_ENABLE_BASIC,
-        )
+            .unwrap()(session_options_ptr, GraphOptimizationLevel_ORT_ENABLE_BASIC)
     };
 
     // Optionally add more execution providers via session_options
@@ -109,7 +106,7 @@ fn main() {
     };
     CheckStatus(g_ort, status).unwrap();
     assert_ne!(num_input_nodes, 0);
-    println!("Number of inputs = {:?}", num_input_nodes);
+    println!("Number of inputs = {num_input_nodes:?}");
     let mut input_node_names: Vec<&str> = Vec::new();
     let mut input_node_dims: Vec<i64> = Vec::new(); // simplify... this model has only 1 input node {1, 3, 224, 224}.
                                                     // Otherwise need vector<vector<>>
@@ -133,7 +130,7 @@ fn main() {
         //          We cannot let Rust free that string, the C side must free the string.
         //          We thus convert the pointer to a string slice (&str).
         let input_name = char_p_to_str(input_name).unwrap();
-        println!("Input {} : name={}", i, input_name);
+        println!("Input {i} : name={input_name}");
         input_node_names.push(input_name);
 
         // print input node types
@@ -159,14 +156,14 @@ fn main() {
         assert_ne!(tensor_info_ptr, std::ptr::null_mut());
 
         let mut type_: ONNXTensorElementDataType =
-            ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+            ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
         let status = unsafe {
             g_ort.as_ref().unwrap().GetTensorElementType.unwrap()(tensor_info_ptr, &mut type_)
         };
         CheckStatus(g_ort, status).unwrap();
         assert_ne!(
             type_,
-            ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED
+            ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED
         );
 
         println!("Input {} : type={}", i, type_ as i32);
@@ -179,8 +176,8 @@ fn main() {
         CheckStatus(g_ort, status).unwrap();
         assert_ne!(num_dims, 0);
 
-        println!("Input {} : num_dims={}", i, num_dims);
-        input_node_dims.resize_with(num_dims as usize, Default::default);
+        println!("Input {i} : num_dims={num_dims}");
+        input_node_dims.resize_with(num_dims, Default::default);
         let status = unsafe {
             g_ort.as_ref().unwrap().GetDimensions.unwrap()(
                 tensor_info_ptr,
@@ -191,7 +188,7 @@ fn main() {
         CheckStatus(g_ort, status).unwrap();
 
         for j in 0..num_dims {
-            println!("Input {} : dim {}={}", i, j, input_node_dims[j as usize]);
+            println!("Input {i} : dim {j}={}", input_node_dims[j]);
         }
 
         unsafe { g_ort.as_ref().unwrap().ReleaseTypeInfo.unwrap()(typeinfo_ptr) };
@@ -229,8 +226,8 @@ fn main() {
     let mut memory_info_ptr: *mut OrtMemoryInfo = std::ptr::null_mut();
     let status = unsafe {
         g_ort.as_ref().unwrap().CreateCpuMemoryInfo.unwrap()(
-            OrtAllocatorType::OrtArenaAllocator,
-            OrtMemType::OrtMemTypeDefault,
+            OrtAllocatorType_OrtArenaAllocator,
+            OrtMemType_OrtMemTypeDefault,
             &mut memory_info_ptr,
         )
     };
@@ -258,7 +255,7 @@ fn main() {
             input_tensor_size * std::mem::size_of::<f32>(),
             shape,
             4,
-            ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+            ONNXTensorElementDataType_ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
             input_tensor_ptr_ptr,
         )
     };
@@ -290,7 +287,7 @@ fn main() {
 
     let output_node_names_cstring: Vec<std::ffi::CString> = output_node_names
         .into_iter()
-        .map(|n| std::ffi::CString::new(n.clone()).unwrap())
+        .map(|n| std::ffi::CString::new(*n).unwrap())
         .collect();
     let output_node_names_ptr: Vec<*const i8> = output_node_names_cstring
         .iter()
@@ -363,7 +360,7 @@ fn main() {
 }
 
 fn CheckStatus(g_ort: *const OrtApi, status: *const OrtStatus) -> Result<(), String> {
-    if status != std::ptr::null() {
+    if status.is_null() {
         let raw = unsafe { g_ort.as_ref().unwrap().GetErrorMessage.unwrap()(status) };
         Err(char_p_to_str(raw).unwrap().to_string())
     } else {
