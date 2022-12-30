@@ -74,7 +74,7 @@ impl AvailableOnnxModel {
         } else {
             info!(
                 model_filepath = format!("{}", model_filepath.display()).as_str(),
-                url = format!("{:?}", url).as_str(),
+                url = format!("{url:?}").as_str(),
                 "Downloading file, please wait....",
             );
 

@@ -118,7 +118,7 @@ impl Environment {
             status_to_result(status).map_err(OrtError::Environment)?;
 
             debug!(
-                env_ptr = format!("{:?}", env_ptr).as_str(),
+                env_ptr = format!("{env_ptr:?}").as_str(),
                 "Environment created."
             );
 
@@ -306,7 +306,7 @@ mod tests {
         let mut prev_env_ptr = G_ENV.env_ptr();
 
         for i in 0..10 {
-            let name = format!("sequential_environment_creation: {}", i);
+            let name = format!("sequential_environment_creation: {i}");
             let env = Environment::builder()
                 .with_name(name.clone())
                 .with_log_level(LoggingLevel::Warning)
@@ -332,7 +332,7 @@ mod tests {
             .map(|t| {
                 let initial_name_cloned = initial_name.clone();
                 std::thread::spawn(move || {
-                    let name = format!("concurrent_environment_creation: {}", t);
+                    let name = format!("concurrent_environment_creation: {t}");
                     let env = Environment::builder()
                         .with_name(name)
                         .with_log_level(LoggingLevel::Warning)
