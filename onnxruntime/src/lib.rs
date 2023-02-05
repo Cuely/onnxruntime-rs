@@ -90,7 +90,7 @@ to download.
 //!
 //! ```no_run
 //! # use std::error::Error;
-//! # use onnxruntime::{environment::Environment, LoggingLevel, GraphOptimizationLevel, tensor::OrtOwnedTensor};
+//! # use onnxruntime::{environment::Environment, LoggingLevel, GraphOptimizationLevel, tensor::OrtOwnedTensor, TypedArray};
 //! # fn main() -> Result<(), Box<dyn Error>> {
 //! # let environment = Environment::builder()
 //! #     .with_name("test")
@@ -103,7 +103,7 @@ to download.
 //! #     .with_model_from_file("squeezenet.onnx")?;
 //! let array = ndarray::Array::linspace(0.0_f32, 1.0, 100);
 //! // Multiple inputs and outputs are possible
-//! let input_tensor = vec![array];
+//! let input_tensor = vec![TypedArray::F32(array)];
 //! let outputs: Vec<OrtOwnedTensor<f32,_>> = session.run(input_tensor)?;
 //! # Ok(())
 //! # }
@@ -119,6 +119,7 @@ use std::sync::{atomic::AtomicPtr, Arc, Mutex};
 
 use lazy_static::lazy_static;
 
+use memory::MemoryInfo;
 use onnxruntime_sys as sys;
 
 // Make functions `extern "stdcall"` for Windows 32bit.
@@ -150,10 +151,13 @@ pub mod tensor;
 
 // Re-export
 pub use error::{OrtApiError, OrtError, Result};
-use sys::OnnxEnumInt;
+use sys::{OnnxEnumInt, OrtValue};
 
 // Re-export ndarray as it's part of the public API anyway
 pub use ndarray;
+
+use crate::tensor::OrtTensor;
+use ndarray::Array;
 
 lazy_static! {
     // static ref G_ORT: Arc<Mutex<AtomicPtr<sys::OrtApi>>> =
@@ -459,6 +463,110 @@ impl_type_trait!(u64, Uint64);
 // impl_type_trait!(, Complex64);
 // impl_type_trait!(, Complex128);
 // impl_type_trait!(, Bfloat16);
+
+#[derive(Debug)]
+pub enum TypedArray<D: ndarray::Dimension> {
+    F32(Array<f32, D>),
+    U8(Array<u8, D>),
+    I8(Array<i8, D>),
+    U16(Array<u16, D>),
+    I16(Array<i16, D>),
+    I32(Array<i32, D>),
+    I64(Array<i64, D>),
+    F64(Array<f64, D>),
+    U32(Array<u32, D>),
+    U64(Array<u64, D>),
+}
+
+impl<D: ndarray::Dimension> TypedArray<D> {
+    fn shape(&self) -> &[usize] {
+        match self {
+            TypedArray::F32(arr) => arr.shape(),
+            TypedArray::U8(arr) => arr.shape(),
+            TypedArray::I8(arr) => arr.shape(),
+            TypedArray::U16(arr) => arr.shape(),
+            TypedArray::I16(arr) => arr.shape(),
+            TypedArray::I32(arr) => arr.shape(),
+            TypedArray::I64(arr) => arr.shape(),
+            TypedArray::F64(arr) => arr.shape(),
+            TypedArray::U32(arr) => arr.shape(),
+            TypedArray::U64(arr) => arr.shape(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum TypedOrtTensor<'t, D: ndarray::Dimension> {
+    F32(OrtTensor<'t, f32, D>),
+    U8(OrtTensor<'t, u8, D>),
+    I8(OrtTensor<'t, i8, D>),
+    U16(OrtTensor<'t, u16, D>),
+    I16(OrtTensor<'t, i16, D>),
+    I32(OrtTensor<'t, i32, D>),
+    I64(OrtTensor<'t, i64, D>),
+    F64(OrtTensor<'t, f64, D>),
+    U32(OrtTensor<'t, u32, D>),
+    U64(OrtTensor<'t, u64, D>),
+}
+
+impl<'t, D: ndarray::Dimension> TypedOrtTensor<'t, D> {
+    pub(crate) fn from_arr<'m>(
+        arr: TypedArray<D>,
+        memory_info: &'m MemoryInfo,
+        allocator_ptr: *mut sys::OrtAllocator,
+    ) -> Result<Self>
+    where
+        'm: 't, // 'm outlives 't (memory info outlives tensor)
+    {
+        match arr {
+            TypedArray::F32(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::F32)
+            }
+            TypedArray::U8(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::U8)
+            }
+            TypedArray::I8(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::I8)
+            }
+            TypedArray::U16(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::U16)
+            }
+            TypedArray::I16(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::I16)
+            }
+            TypedArray::I32(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::I32)
+            }
+            TypedArray::I64(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::I64)
+            }
+            TypedArray::F64(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::F64)
+            }
+            TypedArray::U32(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::U32)
+            }
+            TypedArray::U64(arr) => {
+                OrtTensor::from_array(memory_info, allocator_ptr, arr).map(TypedOrtTensor::U64)
+            }
+        }
+    }
+
+    fn c_ptr(&self) -> *mut OrtValue {
+        match self {
+            TypedOrtTensor::F32(arr) => arr.c_ptr,
+            TypedOrtTensor::U8(arr) => arr.c_ptr,
+            TypedOrtTensor::I8(arr) => arr.c_ptr,
+            TypedOrtTensor::U16(arr) => arr.c_ptr,
+            TypedOrtTensor::I16(arr) => arr.c_ptr,
+            TypedOrtTensor::I32(arr) => arr.c_ptr,
+            TypedOrtTensor::I64(arr) => arr.c_ptr,
+            TypedOrtTensor::F64(arr) => arr.c_ptr,
+            TypedOrtTensor::U32(arr) => arr.c_ptr,
+            TypedOrtTensor::U64(arr) => arr.c_ptr,
+        }
+    }
+}
 
 /// Adapter for common Rust string types to Onnx strings.
 ///

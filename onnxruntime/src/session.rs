@@ -29,7 +29,7 @@ use crate::{
         OrtTensor,
     },
     AllocatorType, GraphOptimizationLevel, MemType, TensorElementDataType,
-    TypeToTensorElementDataType,
+    TypeToTensorElementDataType, TypedArray, TypedOrtTensor,
 };
 
 #[cfg(feature = "model-fetching")]
@@ -378,12 +378,11 @@ impl<'a> Session<'a> {
     ///
     /// Note that ONNX models can have multiple inputs; a `Vec<_>` is thus
     /// used for the input data here.
-    pub fn run<'s, 't, 'm, TIn, TOut, D>(
+    pub fn run<'s, 't, 'm, TOut, D>(
         &'s mut self,
-        input_arrays: Vec<Array<TIn, D>>,
+        input_arrays: Vec<TypedArray<D>>,
     ) -> Result<Vec<OrtOwnedTensor<'t, 'm, TOut, ndarray::IxDyn>>>
     where
-        TIn: TypeToTensorElementDataType + Debug + Clone,
         TOut: TypeToTensorElementDataType + Debug + Clone,
         D: ndarray::Dimension,
         'm: 't, // 'm outlives 't (memory info outlives tensor)
@@ -416,15 +415,15 @@ impl<'a> Session<'a> {
             vec![std::ptr::null_mut(); self.outputs.len()];
 
         // The C API expects pointers for the arrays (pointers to C-arrays)
-        let input_ort_tensors: Vec<OrtTensor<TIn, D>> = input_arrays
+        let input_ort_tensors: Vec<TypedOrtTensor<D>> = input_arrays
             .into_iter()
             .map(|input_array| {
-                OrtTensor::from_array(&self.memory_info, self.allocator_ptr, input_array)
+                TypedOrtTensor::from_arr(input_array, &self.memory_info, self.allocator_ptr)
             })
-            .collect::<Result<Vec<OrtTensor<TIn, D>>>>()?;
+            .collect::<Result<_>>()?;
         let input_ort_values: Vec<*const sys::OrtValue> = input_ort_tensors
             .iter()
-            .map(|input_array_ort| input_array_ort.c_ptr as *const sys::OrtValue)
+            .map(|input_array_ort| input_array_ort.c_ptr() as *const sys::OrtValue)
             .collect();
 
         let run_options_ptr: *const sys::OrtRunOptions = std::ptr::null();
@@ -485,9 +484,8 @@ impl<'a> Session<'a> {
     //     Tensor::from_array(self, array)
     // }
 
-    fn validate_input_shapes<TIn, D>(&mut self, input_arrays: &[Array<TIn, D>]) -> Result<()>
+    fn validate_input_shapes<D>(&mut self, input_arrays: &[TypedArray<D>]) -> Result<()>
     where
-        TIn: TypeToTensorElementDataType + Debug + Clone,
         D: ndarray::Dimension,
     {
         // ******************************************************************
