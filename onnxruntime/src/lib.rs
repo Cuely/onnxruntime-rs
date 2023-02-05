@@ -496,7 +496,7 @@ impl<D: ndarray::Dimension> TypedArray<D> {
 }
 
 #[derive(Debug)]
-pub enum TypedOrtTensor<'t, D: ndarray::Dimension> {
+pub(crate) enum TypedOrtTensor<'t, D: ndarray::Dimension> {
     F32(OrtTensor<'t, f32, D>),
     U8(OrtTensor<'t, u8, D>),
     I8(OrtTensor<'t, i8, D>),
